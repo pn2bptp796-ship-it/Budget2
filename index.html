@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Конвертний Бюджет & Аналітика</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-200 min-h-screen flex flex-col font-sans">
+
+    <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-30 px-4 py-3 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
+        <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                <i class="fa-solid fa-wallet"></i>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                EnvelopePay
+            </h1>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button id="themeToggle" class="p-2 rounded-xl text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 bg-gray-100 dark:bg-gray-700 transition">
+                <i class="fa-solid fa-moon dark:hidden"></i>
+                <i class="fa-solid fa-sun hidden dark:inline"></i>
+            </button>
+            <button onclick="openModal('backupModal')" class="p-2 rounded-xl text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 bg-gray-100 dark:bg-gray-700 transition">
+                <i class="fa-solid fa-file-export"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-lg w-full mx-auto p-4 pb-24 space-y-5">
+
+        <!-- Головний екран (Дашборд) -->
+        <section id="view-dashboard" class="view-section space-y-4">
+            
+            <!-- Загальний стан / До розподілу -->
+            <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden">
+                <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs uppercase tracking-wider text-indigo-200 font-semibold">До розподілу (Ready to Assign)</span>
+                    <span id="healthScoreBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 backdrop-blur-md">
+                        Health: 100%
+                    </span>
+                </div>
+                <div class="text-3xl font-extrabold mb-4" id="readyToAssignDisplay">0.00 ₴</div>
+                
+                <div class="grid grid-cols-2 gap-3 pt-3 border-t border-white/15 text-sm">
+                    <div>
+                        <div class="text-indigo-200 text-xs">Загальні збереження</div>
+                        <div class="font-bold text-base" id="totalNetWorthDisplay">0.00 ₴</div>
+                    </div>
+                    <div>
+                        <div class="text-indigo-200 text-xs">Всього в конвертах</div>
+                        <div class="font-bold text-base" id="totalEnvelopesDisplay">0.00 ₴</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Швидкі кнопки (Quick Presets) -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Швидкі витрати (в 1 тап)</h3>
+                    <button onclick="openQuickPresetSetup()" class="text-xs text-indigo-600 dark:text-indigo-400 font-medium">Налаштувати</button>
+                </div>
+                <div class="grid grid-cols-3 gap-2" id="quickPresetsContainer">
+                    <!-- Заповнюється JS -->
+                </div>
+            </div>
+
+            <!-- Інтерактивні Діаграми -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-3">
+                <div class="flex flex-wrap justify-between items-center gap-2">
+                    <select id="chartTypeSelect" onchange="updateCharts()" class="bg-gray-100 dark:bg-gray-700 text-xs font-semibold rounded-xl px-2.5 py-1.5 outline-none border-none">
+                        <option value="expenses">Витрати за конвертами</option>
+                        <option value="inOut">Надходження та Витрати</option>
+                        <option value="balance">Динаміка балансу</option>
+                    </select>
+
+                    <select id="chartPeriodSelect" onchange="updateCharts()" class="bg-gray-100 dark:bg-gray-700 text-xs rounded-xl px-2.5 py-1.5 outline-none border-none">
+                        <option value="month">Поточний місяць</option>
+                        <option value="lastMonth">Минулий місяць</option>
+                        <option value="all">За весь час</option>
+                    </select>
+                </div>
+
+                <div class="relative h-60 w-full flex items-center justify-center">
+                    <canvas id="mainChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Фінансовий аналіз та аналітика -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-3">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center justify-between">
+                    <span>Аналітика місяця</span>
+                    <i class="fa-solid fa-chart-line text-indigo-500"></i>
+                </h3>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Середньодобова витрата</div>
+                        <div class="text-lg font-bold text-gray-800 dark:text-gray-100" id="dailyBurnRateDisplay">0 ₴/день</div>
+                    </div>
+                    <div class="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Прогноз до кінця місяця</div>
+                        <div class="text-lg font-bold text-gray-800 dark:text-gray-100" id="projectedExpenseDisplay">0 ₴</div>
+                    </div>
+                    <div class="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Норма заощаджень</div>
+                        <div class="text-lg font-bold text-emerald-600 dark:text-emerald-400" id="savingsRateDisplay">0%</div>
+                    </div>
+                    <div class="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Здоров'я бюджету</div>
+                        <div class="text-lg font-bold text-indigo-600 dark:text-indigo-400" id="budgetHealthDisplay">100 / 100</div>
+                    </div>
+                </div>
+
+                <!-- Топ витрат -->
+                <div class="pt-2">
+                    <div class="text-xs font-semibold text-gray-500 mb-2">Топ-3 найзатратніших конвертів:</div>
+                    <div id="topEnvelopesList" class="space-y-1.5 text-sm">
+                        <!-- Заповнюється через JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Утиліти: Калькулятор чужих витрат / Конвертер -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-3">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center justify-between">
+                    <span>Розподіл чеку / Калькулятор</span>
+                    <i class="fa-solid fa-users-slash text-purple-500"></i>
+                </h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <input type="number" id="splitBillTotal" placeholder="Сума чеку" class="bg-gray-100 dark:bg-gray-700 p-2.5 rounded-xl text-sm outline-none w-full">
+                    <input type="number" id="splitBillPeople" placeholder="Осіб" value="2" class="bg-gray-100 dark:bg-gray-700 p-2.5 rounded-xl text-sm outline-none w-full">
+                    <button onclick="calculateSplitBill()" class="bg-indigo-600 text-white rounded-xl font-bold text-xs p-2.5 hover:bg-indigo-700 transition">Порахувати</button>
+                </div>
+                <div id="splitBillResult" class="hidden text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 p-2.5 rounded-xl text-center"></div>
+            </div>
+
+        </section>
+
+        <section id="view-envelopes" class="view-section hidden space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold">Конверти витрат</h2>
+                <button onclick="openModal('addEnvelopeModal')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow transition flex items-center gap-1">
+                    <i class="fa-solid fa-plus"></i> Новий конверт
+                </button>
+            </div>
+            <div id="envelopesList" class="space-y-3">
+                <!-- Конверти заповнюються через JS -->
+            </div>
+        </section>
+
+        <section id="view-accounts" class="view-section hidden space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold">Рахунки та Картки</h2>
+                <button onclick="openModal('addAccountModal')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow transition flex items-center gap-1">
+                    <i class="fa-solid fa-plus"></i> Новий рахунок
+                </button>
+            </div>
+            
+            <div id="accountsList" class="grid grid-cols-2 gap-3">
+                <!-- Рахунки JS -->
+            </div>
+
+            <div class="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-base font-bold">Історія транзакцій</h3>
+                    <button onclick="openTransferModal()" class="text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 px-2.5 py-1.5 rounded-xl font-semibold transition">
+                        <i class="fa-solid fa-right-left mr-1"></i>Переказ між картками
+                    </button>
+                </div>
+                <div id="transactionsList" class="space-y-3">
+                    <!-- Транзакції JS -->
+                </div>
+            </div>
+        </section>
+
+        <section id="view-ai" class="view-section hidden space-y-4 flex flex-col h-[75vh]">
+            <div class="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-2xl text-white shadow-md flex justify-between items-center">
+                <div>
+                    <h2 class="text-base font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Фінансовий AI Порадник
+                    </h2>
+                    <p class="text-xs text-purple-100">Аналізує ваші конверти та витрати</p>
+                </div>
+                <button onclick="generateAiFinancialReview()" class="bg-white/20 hover:bg-white/30 text-white text-xs px-2.5 py-1.5 rounded-xl font-bold backdrop-blur-md transition">
+                    Швидкий аудит
+                </button>
+            </div>
+
+            <div id="chatMessages" class="flex-1 bg-white dark:bg-gray-800 rounded-2xl p-4 overflow-y-auto space-y-3 border border-gray-100 dark:border-gray-700 text-sm no-scrollbar">
+                <div class="bg-indigo-50 dark:bg-gray-700/60 p-3 rounded-2xl max-w-[85%] text-gray-700 dark:text-gray-200">
+                    Вітаю! Я ваш особистий фінансовий помічник. Запитайте мене про оптимізацію витрат, як заповнити конверти, або попросіть провести аналіз бюджету!
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <input type="text" id="aiInput" placeholder="Запитати у AI..." class="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3 rounded-2xl text-sm outline-none focus:border-indigo-500">
+                <button onclick="sendAiMessage()" class="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-2xl transition">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-lg border-t border-gray-200 dark:border-gray-700 z-30">
+        <div class="max-w-lg mx-auto flex justify-around items-center py-2 px-3">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn flex flex-col items-center text-indigo-600 dark:text-indigo-400">
+                <i class="fa-solid fa-chart-pie text-lg"></i>
+                <span class="text-[10px] mt-0.5 font-medium">Головна</span>
+            </button>
+            <button onclick="switchTab('envelopes')" id="nav-envelopes" class="nav-btn flex flex-col items-center text-gray-400 hover:text-indigo-500">
+                <i class="fa-solid fa-box-archive text-lg"></i>
+                <span class="text-[10px] mt-0.5 font-medium">Конверти</span>
+            </button>
+            
+            <!-- Центральна кнопка швидкої транзакції -->
+            <button onclick="openModal('addTransactionModal')" class="bg-indigo-600 hover:bg-indigo-700 text-white p-3.5 rounded-full shadow-lg transform -translate-y-3 transition active:scale-95">
+                <i class="fa-solid fa-plus text-xl"></i>
+            </button>
+
+            <button onclick="switchTab('accounts')" id="nav-accounts" class="nav-btn flex flex-col items-center text-gray-400 hover:text-indigo-500">
+                <i class="fa-solid fa-credit-card text-lg"></i>
+                <span class="text-[10px] mt-0.5 font-medium">Рахунки</span>
+            </button>
+            <button onclick="switchTab('ai')" id="nav-ai" class="nav-btn flex flex-col items-center text-gray-400 hover:text-indigo-500">
+                <i class="fa-solid fa-robot text-lg"></i>
+                <span class="text-[10px] mt-0.5 font-medium">AI Порадник</span>
+            </button>
+        </div>
+    </nav>
+
+    
+    <!-- Модалка додавання/редагування транзакцій -->
+    <div id="addTransactionModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-gray-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg" id="transactionModalTitle">Нова транзакція</h3>
+                <button onclick="closeModal('addTransactionModal')" class="text-gray-400 text-xl">&times;</button>
+            </div>
+            
+            <form id="transactionForm" onsubmit="handleTransactionSubmit(event)" class="space-y-3">
+                <input type="hidden" id="txId">
+                
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Тип</label>
+                    <div class="grid grid-cols-2 gap-2 mt-1">
+                        <button type="button" id="typeExpenseBtn" onclick="setTxType('expense')" class="py-2 rounded-xl border-2 border-indigo-600 text-indigo-600 font-bold text-xs bg-indigo-50 dark:bg-indigo-900/30">Витрата</button>
+                        <button type="button" id="typeIncomeBtn" onclick="setTxType('income')" class="py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 font-bold text-xs">Дохід</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Сума (₴)</label>
+                    <input type="number" step="0.01" id="txAmount" required class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-lg font-bold outline-none">
+                </div>
+
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Рахунок</label>
+                    <select id="txAccount" required class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none"></select>
+                </div>
+
+                <div id="envelopeSelectContainer">
+                    <label class="text-xs font-semibold text-gray-500">Конверт витрати</label>
+                    <select id="txEnvelope" class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none"></select>
+                </div>
+
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Опис / Отримувач</label>
+                    <input type="text" id="txNote" placeholder="Напр. Супермаркет" class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none">
+                </div>
+
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Дата</label>
+                    <input type="date" id="txDate" required class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none">
+                </div>
+
+                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl shadow-md hover:bg-indigo-700 transition">Зберегти</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модалка переказу YNAB (між картками) -->
+    <div id="transferModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-gray-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg">Переказ між картками</h3>
+                <button onclick="closeModal('transferModal')" class="text-gray-400 text-xl">&times;</button>
+            </div>
+            <p class="text-xs text-gray-500">Переказ між власними рахунками не змінює залишки в конвертах.</p>
+            <form onsubmit="handleTransferSubmit(event)" class="space-y-3">
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">З рахунку</label>
+                    <select id="transferFrom" required class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none"></select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">На рахунок</label>
+                    <select id="transferTo" required class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none"></select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Сума (₴)</label>
+                    <input type="number" step="0.01" id="transferAmount" required class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-lg font-bold outline-none">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl shadow-md hover:bg-indigo-700 transition">Здійснити переказ</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модалка додавання конверту -->
+    <div id="addEnvelopeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-gray-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg">Новий конверт</h3>
+                <button onclick="closeModal('addEnvelopeModal')" class="text-gray-400 text-xl">&times;</button>
+            </div>
+            <form onsubmit="handleEnvelopeSubmit(event)" class="space-y-3">
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Назва конверта</label>
+                    <input type="text" id="envName" required placeholder="Напр. Продукти, Комуналка" class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Місячна ціль / Бюджет (₴)</label>
+                    <input type="number" step="0.01" id="envTarget" placeholder="0.00" class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Іконка</label>
+                    <select id="envIcon" class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none">
+                        <option value="fa-cart-shopping">🛒 Продукти</option>
+                        <option value="fa-house">🏠 Дім / Оренда</option>
+                        <option value="fa-car">🚗 Авто / Транспорт</option>
+                        <option value="fa-mug-hot">☕ Розваги / Кава</option>
+                        <option value="fa-heart-pulse">💊 Здоров'я</option>
+                        <option value="fa-shield-halved">🛡️ Резерв</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl shadow-md hover:bg-indigo-700 transition">Створити конверт</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модалка поповнення/розподілу в конверт -->
+    <div id="assignEnvelopeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-gray-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg" id="assignModalTitle">Розподілити в конверт</h3>
+                <button onclick="closeModal('assignEnvelopeModal')" class="text-gray-400 text-xl">&times;</button>
+            </div>
+            <form onsubmit="handleAssignSubmit(event)" class="space-y-3">
+                <input type="hidden" id="assignEnvId">
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Додати/Зняти з "До розподілу" (₴)</label>
+                    <input type="number" step="0.01" id="assignAmount" required placeholder="0.00" class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-lg font-bold outline-none">
+                    <p class="text-xs text-gray-400 mt-1">Використовуйте мінус, щоб повернути кошти назад у "До розподілу".</p>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl shadow-md hover:bg-indigo-700 transition">Підтвердити</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модалка додавання рахунку -->
+    <div id="addAccountModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-gray-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg">Новий рахунок</h3>
+                <button onclick="closeModal('addAccountModal')" class="text-gray-400 text-xl">&times;</button>
+            </div>
+            <form onsubmit="handleAccountSubmit(event)" class="space-y-3">
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Назва рахунку</label>
+                    <input type="text" id="accName" required placeholder="Напр. Монобанк, Готівка" class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Початковий баланс (₴)</label>
+                    <input type="number" step="0.01" id="accBalance" required placeholder="0.00" class="w-full mt-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-xl text-sm outline-none">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl shadow-md hover:bg-indigo-700 transition">Створити рахунок</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модалка Баків / Backup Data -->
+    <div id="backupModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-gray-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg">Резервне копіювання</h3>
+                <button onclick="closeModal('backupModal')" class="text-gray-400 text-xl">&times;</button>
+            </div>
+            <div class="space-y-2">
+                <button onclick="exportData()" class="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 p-3 rounded-xl text-sm font-semibold flex items-center justify-between">
+                    <span><i class="fa-solid fa-download mr-2 text-indigo-500"></i> Експорт даних (JSON)</span>
+                    <i class="fa-solid fa-chevron-right text-xs text-gray-400"></i>
+                </button>
+                <label class="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 p-3 rounded-xl text-sm font-semibold flex items-center justify-between cursor-pointer">
+                    <span><i class="fa-solid fa-upload mr-2 text-indigo-500"></i> Імпорт даних з JSON</span>
+                    <input type="file" onchange="importData(event)" accept=".json" class="hidden">
+                    <i class="fa-solid fa-chevron-right text-xs text-gray-400"></i>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_STATE = {
+            readyToAssign: 0,
+            accounts: [
+                { id: 'acc_1', name: 'Картка Monobank', balance: 15000 },
+                { id: 'acc_2', name: 'Готівка', balance: 2500 }
+            ],
+            envelopes: [
+                { id: 'env_1', name: 'Продукти', assigned: 5000, balance: 3200, target: 6000, icon: 'fa-cart-shopping' },
+                { id: 'env_2', name: 'Комуналка', assigned: 2000, balance: 2000, target: 2000, icon: 'fa-house' },
+                { id: 'env_3', name: 'Кава та розваги', assigned: 1500, balance: 450, target: 1500, icon: 'fa-mug-hot' }
+            ],
+            transactions: [
+                { id: 'tx_1', type: 'expense', amount: 150, accountId: 'acc_1', envelopeId: 'env_3', note: 'Кав\'ярня', date: new Date().toISOString().split('T')[0] },
+                { id: 'tx_2', type: 'expense', amount: 1800, accountId: 'acc_1', envelopeId: 'env_1', note: 'Сільпо', date: new Date().toISOString().split('T')[0] }
+            ],
+            quickPresets: [
+                { name: 'Кава', amount: 60, envId: 'env_3' },
+                { name: 'Проїзд', amount: 20, envId: 'env_3' },
+                { name: 'Обіди', amount: 150, envId: 'env_1' }
+            ]
+        };
+
+        let state = JSON.parse(localStorage.getItem('envelope_pay_db')) || DEFAULT_STATE;
+        let currentChart = null;
+        let currentTxType = 'expense';
+
+        function saveState() {
+            localStorage.setItem('envelope_pay_db', JSON.stringify(state));
+            renderAll();
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-indigo-600', 'dark:text-indigo-400');
+                btn.classList.add('text-gray-400');
+            });
+            const activeBtn = document.getElementById(`nav-${tabId}`);
+            if(activeBtn) {
+                activeBtn.classList.add('text-indigo-600', 'dark:text-indigo-400');
+                activeBtn.classList.remove('text-gray-400');
+            }
+
+            if(tabId === 'dashboard') {
+                updateCharts();
+            }
+        }
+
+        // Темна/Світла тема
+        const themeToggleBtn = document.getElementById('themeToggle');
+        themeToggleBtn.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateCharts();
+        });
+
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+
+        function calculateMetrics() {
+            const totalAccountsBalance = state.accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
+            const totalEnvelopesBalance = state.envelopes.reduce((sum, env) => sum + Number(env.balance), 0);
+            
+            // Ready to Assign = Всі гроші на картках - Всі гроші в конвертах
+            state.readyToAssign = totalAccountsBalance - totalEnvelopesBalance;
+
+            // Фільтрація транзакцій за поточний місяць
+            const now = new Date();
+            const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const monthTx = state.transactions.filter(t => t.date.startsWith(currentMonthPrefix));
+
+            const totalSpentThisMonth = monthTx
+                .filter(t => t.type === 'expense')
+                .reduce((s, t) => s + Number(t.amount), 0);
+
+            const totalIncomeThisMonth = monthTx
+                .filter(t => t.type === 'income')
+                .reduce((s, t) => s + Number(t.amount), 0);
+
+            // Середньодобові витрати (Burn rate)
+            const dayOfMonth = now.getDate();
+            const dailyBurn = dayOfMonth > 0 ? (totalSpentThisMonth / dayOfMonth) : 0;
+
+            // Прогноз витрат до кінця місяця
+            const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            const projectedExpense = dailyBurn * daysInMonth;
+
+            // Норма заощаджень (% Savings Rate)
+            const savingsRate = totalIncomeThisMonth > 0 
+                ? Math.max(0, Math.round(((totalIncomeThisMonth - totalSpentThisMonth) / totalIncomeThisMonth) * 100)) 
+                : 0;
+
+            // Budget Health Score (Оцінка здоров'я бюджету)
+            let healthScore = 100;
+            if(state.readyToAssign < 0) healthScore -= 30; // Перевитрата
+            const overspentEnvelopes = state.envelopes.filter(e => e.balance < 0).length;
+            healthScore -= (overspentEnvelopes * 15);
+            healthScore = Math.max(0, Math.min(100, healthScore));
+
+            return {
+                totalAccountsBalance,
+                totalEnvelopesBalance,
+                totalSpentThisMonth,
+                totalIncomeThisMonth,
+                dailyBurn,
+                projectedExpense,
+                savingsRate,
+                healthScore
+            };
+        }
+
+        function renderAll() {
+            const metrics = calculateMetrics();
+
+            // Дашборд метрики
+            document.getElementById('readyToAssignDisplay').textContent = `${metrics.readyToAssign.toFixed(2)} ₴`;
+            document.getElementById('totalNetWorthDisplay').textContent = `${metrics.totalAccountsBalance.toFixed(2)} ₴`;
+            document.getElementById('totalEnvelopesDisplay').textContent = `${metrics.totalEnvelopesBalance.toFixed(2)} ₴`;
+            
+            document.getElementById('dailyBurnRateDisplay').textContent = `${metrics.dailyBurn.toFixed(0)} ₴/день`;
+            document.getElementById('projectedExpenseDisplay').textContent = `${metrics.projectedExpense.toFixed(0)} ₴`;
+            document.getElementById('savingsRateDisplay').textContent = `${metrics.savingsRate}%`;
+            document.getElementById('budgetHealthDisplay').textContent = `${metrics.healthScore} / 100`;
+
+            const badge = document.getElementById('healthScoreBadge');
+            badge.textContent = `Health: ${metrics.healthScore}%`;
+            badge.className = `px-2.5 py-0.5 rounded-full text-xs font-bold backdrop-blur-md ${
+                metrics.healthScore > 80 ? 'bg-emerald-500/30 text-emerald-100' : 
+                metrics.healthScore > 50 ? 'bg-amber-500/30 text-amber-100' : 'bg-rose-500/30 text-rose-100'
+            }`;
+
+            renderQuickPresets();
+            renderTopEnvelopes();
+            renderEnvelopes();
+            renderAccounts();
+            renderTransactions();
+            populateDropdowns();
+            updateCharts();
+        }
+
+        function renderQuickPresets() {
+            const container = document.getElementById('quickPresetsContainer');
+            container.innerHTML = state.quickPresets.map(p => {
+                const env = state.envelopes.find(e => e.id === p.envId);
+                return `
+                    <button onclick="executeQuickPreset('${p.name}', ${p.amount}, '${p.envId}')" 
+                            class="p-2.5 bg-gray-50 dark:bg-gray-700/60 hover:bg-indigo-50 dark:hover:bg-gray-700 rounded-xl text-left border border-gray-100 dark:border-gray-600 transition">
+                        <div class="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">${p.name}</div>
+                        <div class="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 mt-0.5">-${p.amount} ₴</div>
+                        <div class="text-[10px] text-gray-400 truncate">${env ? env.name : 'Конверт'}</div>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function executeQuickPreset(name, amount, envId) {
+            if(state.accounts.length === 0) {
+                alert('Спочатку додайте хоча б один рахунок!');
+                return;
+            }
+            const defaultAcc = state.accounts[0];
+            const newTx = {
+                id: 'tx_' + Date.now(),
+                type: 'expense',
+                amount: Number(amount),
+                accountId: defaultAcc.id,
+                envelopeId: envId,
+                note: `Швидка витрата: ${name}`,
+                date: new Date().toISOString().split('T')[0]
+            };
+
+            // Оновлюємо баланси
+            defaultAcc.balance -= Number(amount);
+            const env = state.envelopes.find(e => e.id === envId);
+            if(env) env.balance -= Number(amount);
+
+            state.transactions.unshift(newTx);
+            saveState();
+        }
+
+        function renderTopEnvelopes() {
+            const now = new Date();
+            const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            
+            // Групування витрат по конвертах за поточний місяць
+            const envSpentMap = {};
+            state.transactions
+                .filter(t => t.type === 'expense' && t.date.startsWith(currentMonthPrefix) && t.envelopeId)
+                .forEach(t => {
+                    envSpentMap[t.envelopeId] = (envSpentMap[t.envelopeId] || 0) + Number(t.amount);
+                });
+
+            const sortedEnvelopes = Object.entries(envSpentMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3);
+
+            const container = document.getElementById('topEnvelopesList');
+            if(sortedEnvelopes.length === 0) {
+                container.innerHTML = `<div class="text-xs text-gray-400">Ще немає витрат у цьому місяці.</div>`;
+                return;
+            }
+
+            container.innerHTML = sortedEnvelopes.map(([envId, spent]) => {
+                const env = state.envelopes.find(e => e.id === envId);
+                if(!env) return '';
+                return `
+                    <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-700/30 p-2 rounded-xl">
+                        <span class="font-medium text-xs flex items-center gap-1.5">
+                            <i class="fa-solid ${env.icon} text-indigo-500"></i> ${env.name}
+                        </span>
+                        <span class="font-bold text-xs text-rose-500">-${spent.toFixed(2)} ₴</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderEnvelopes() {
+            const container = document.getElementById('envelopesList');
+            container.innerHTML = state.envelopes.map(env => {
+                const percent = env.target > 0 ? Math.min(100, Math.round((env.balance / env.target) * 100)) : 0;
+                return `
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-lg">
+                                    <i class="fa-solid ${env.icon}"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-sm">${env.name}</h4>
+                                    <div class="text-xs text-gray-400">Ціль: ${env.target ? env.target + ' ₴' : 'Не вказано'}</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-base font-extrabold ${env.balance < 0 ? 'text-rose-500' : 'text-gray-800 dark:text-gray-100'}">${env.balance.toFixed(2)} ₴</div>
+                                <button onclick="openAssignModal('${env.id}', '${env.name}')" class="mt-1 text-xs text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-lg">
+                                    + Поповнити
+                                </button>
+                            </div>
+                        </div>
+                        <div class="w-full bg-gray-100 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
+                            <div class="bg-indigo-600 h-full rounded-full transition-all duration-300" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderAccounts() {
+            const container = document.getElementById('accountsList');
+            container.innerHTML = state.accounts.map(acc => `
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                    <div class="text-xs text-gray-400 font-medium">${acc.name}</div>
+                    <div class="text-lg font-extrabold text-gray-800 dark:text-gray-100 mt-1">${Number(acc.balance).toFixed(2)} ₴</div>
+                </div>
+            `).join('');
+        }
+
+        function renderTransactions() {
+            const container = document.getElementById('transactionsList');
+            if(state.transactions.length === 0) {
+                container.innerHTML = `<div class="text-center text-xs text-gray-400 py-4">Транзакцій ще немає</div>`;
+                return;
+            }
+
+            container.innerHTML = state.transactions.map(tx => {
+                const acc = state.accounts.find(a => a.id === tx.accountId);
+                const env = state.envelopes.find(e => e.id === tx.envelopeId);
+                const isExpense = tx.type === 'expense';
+                
+                return `
+                    <div class="bg-white dark:bg-gray-800 p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-xl ${isExpense ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'} flex items-center justify-center text-sm">
+                                <i class="fa-solid ${isExpense ? 'fa-arrow-up-right-dots' : 'fa-arrow-down-left-and-arrow-up-right-to-center'}"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold">${tx.note || (isExpense ? 'Витрата' : 'Надходження')}</div>
+                                <div class="text-[10px] text-gray-400">
+                                    ${acc ? acc.name : ''} ${env ? '• ' + env.name : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-bold ${isExpense ? 'text-rose-500' : 'text-emerald-500'}">
+                                ${isExpense ? '-' : '+'}${Number(tx.amount).toFixed(2)} ₴
+                            </div>
+                            <div class="text-[10px] text-gray-400">${tx.date}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateCharts() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            const type = document.getElementById('chartTypeSelect').value;
+            const period = document.getElementById('chartPeriodSelect').value;
+
+            // Фільтрація за періодом
+            const now = new Date();
+            let filteredTx = [...state.transactions];
+
+            if(period === 'month') {
+                const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                filteredTx = filteredTx.filter(t => t.date.startsWith(prefix));
+            } else if(period === 'lastMonth') {
+                const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const prefix = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+                filteredTx = filteredTx.filter(t => t.date.startsWith(prefix));
+            }
+
+            if(currentChart) currentChart.destroy();
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#f3f4f6' : '#1f2937';
+
+            if(type === 'expenses') {
+                // Кругова діаграма по конвертах
+                const envMap = {};
+                filteredTx.filter(t => t.type === 'expense' && t.envelopeId).forEach(t => {
+                    const env = state.envelopes.find(e => e.id === t.envelopeId);
+                    const name = env ? env.name : 'Інше';
+                    envMap[name] = (envMap[name] || 0) + Number(t.amount);
+                });
+
+                currentChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(envMap),
+                        datasets: [{
+                            data: Object.values(envMap),
+                            backgroundColor: ['#6366f1', '#ec4899', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: textColor, font: { size: 10 } } } }
+                    }
+                });
+            } else if(type === 'inOut') {
+                // Стовпчаста діаграма Доходи vs Витрати
+                const inc = filteredTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
+                const exp = filteredTx.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+
+                currentChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Надходження', 'Витрати'],
+                        datasets: [{
+                            data: [inc, exp],
+                            backgroundColor: ['#10b981', '#f43f5e'],
+                            borderRadius: 12
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: textColor } },
+                            y: { ticks: { color: textColor } }
+                        }
+                    }
+                });
+            } else if(type === 'balance') {
+                // Динаміка балансу (лінійний графік)
+                currentChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: state.envelopes.map(e => e.name),
+                        datasets: [{
+                            label: 'Залишок у конвертах',
+                            data: state.envelopes.map(e => e.balance),
+                            borderColor: '#6366f1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: textColor } } },
+                        scales: {
+                            x: { ticks: { color: textColor } },
+                            y: { ticks: { color: textColor } }
+                        }
+                    }
+                });
+            }
+        }
+
+        function populateDropdowns() {
+            const accSelects = [document.getElementById('txAccount'), document.getElementById('transferFrom'), document.getElementById('transferTo')];
+            accSelects.forEach(select => {
+                if(select) {
+                    select.innerHTML = state.accounts.map(a => `<option value="${a.id}">${a.name} (${a.balance} ₴)</option>`).join('');
+                }
+            });
+
+            const envSelect = document.getElementById('txEnvelope');
+            if(envSelect) {
+                envSelect.innerHTML = state.envelopes.map(e => `<option value="${e.id}">${e.name} (${e.balance} ₴)</option>`).join('');
+            }
+        }
+
+        function setTxType(type) {
+            currentTxType = type;
+            const expBtn = document.getElementById('typeExpenseBtn');
+            const incBtn = document.getElementById('typeIncomeBtn');
+            const envContainer = document.getElementById('envelopeSelectContainer');
+
+            if(type === 'expense') {
+                expBtn.className = "py-2 rounded-xl border-2 border-indigo-600 text-indigo-600 font-bold text-xs bg-indigo-50 dark:bg-indigo-900/30";
+                incBtn.className = "py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 font-bold text-xs";
+                envContainer.classList.remove('hidden');
+            } else {
+                incBtn.className = "py-2 rounded-xl border-2 border-indigo-600 text-indigo-600 font-bold text-xs bg-indigo-50 dark:bg-indigo-900/30";
+                expBtn.className = "py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 font-bold text-xs";
+                envContainer.classList.add('hidden');
+            }
+        }
+
+        function handleTransactionSubmit(e) {
+            e.preventDefault();
+            const amount = Number(document.getElementById('txAmount').value);
+            const accId = document.getElementById('txAccount').value;
+            const envId = document.getElementById('txEnvelope').value;
+            const note = document.getElementById('txNote').value;
+            const date = document.getElementById('txDate').value;
+
+            const account = state.accounts.find(a => a.id === accId);
+            if(!account) return;
+
+            if(currentTxType === 'expense') {
+                account.balance -= amount;
+                const env = state.envelopes.find(e => e.id === envId);
+                if(env) env.balance -= amount;
+            } else {
+                account.balance += amount;
+                // Дохід потрапляє в "До розподілу" (Ready to Assign)
+            }
+
+            state.transactions.unshift({
+                id: 'tx_' + Date.now(),
+                type: currentTxType,
+                amount,
+                accountId: accId,
+                envelopeId: currentTxType === 'expense' ? envId : null,
+                note,
+                date
+            });
+
+            closeModal('addTransactionModal');
+            saveState();
+        }
+
+        function handleTransferSubmit(e) {
+            e.preventDefault();
+            const fromId = document.getElementById('transferFrom').value;
+            const toId = document.getElementById('transferTo').value;
+            const amount = Number(document.getElementById('transferAmount').value);
+
+            if(fromId === toId) {
+                alert('Виберіть різні рахунки для переказу!');
+                return;
+            }
+
+            const fromAcc = state.accounts.find(a => a.id === fromId);
+            const toAcc = state.accounts.find(a => a.id === toId);
+
+            if(fromAcc && toAcc) {
+                fromAcc.balance -= amount;
+                toAcc.balance += amount;
+
+                state.transactions.unshift({
+                    id: 'tx_' + Date.now(),
+                    type: 'transfer',
+                    amount,
+                    accountId: fromId,
+                    note: `Переказ на ${toAcc.name}`,
+                    date: new Date().toISOString().split('T')[0]
+                });
+            }
+
+            closeModal('transferModal');
+            saveState();
+        }
+
+        function openAssignModal(envId, envName) {
+            document.getElementById('assignEnvId').value = envId;
+            document.getElementById('assignModalTitle').textContent = `Поповнити конверт: ${envName}`;
+            openModal('assignEnvelopeModal');
+        }
+
+        function handleAssignSubmit(e) {
+            e.preventDefault();
+            const envId = document.getElementById('assignEnvId').value;
+            const amount = Number(document.getElementById('assignAmount').value);
+
+            const env = state.envelopes.find(e => e.id === envId);
+            if(env) {
+                env.balance += amount;
+                env.assigned += amount;
+            }
+
+            closeModal('assignEnvelopeModal');
+            saveState();
+        }
+
+        function handleEnvelopeSubmit(e) {
+            e.preventDefault();
+            const name = document.getElementById('envName').value;
+            const target = Number(document.getElementById('envTarget').value) || 0;
+            const icon = document.getElementById('envIcon').value;
+
+            state.envelopes.push({
+                id: 'env_' + Date.now(),
+                name,
+                assigned: 0,
+                balance: 0,
+                target,
+                icon
+            });
+
+            closeModal('addEnvelopeModal');
+            saveState();
+        }
+
+        function handleAccountSubmit(e) {
+            e.preventDefault();
+            const name = document.getElementById('accName').value;
+            const balance = Number(document.getElementById('accBalance').value) || 0;
+
+            state.accounts.push({
+                id: 'acc_' + Date.now(),
+                name,
+                balance
+            });
+
+            closeModal('addAccountModal');
+            saveState();
+        }
+
+        function calculateSplitBill() {
+            const total = Number(document.getElementById('splitBillTotal').value);
+            const people = Number(document.getElementById('splitBillPeople').value);
+            const res = document.getElementById('splitBillResult');
+
+            if(total > 0 && people > 0) {
+                const perPerson = (total / people).toFixed(2);
+                res.textContent = `Кожен має сплатити: ${perPerson} ₴`;
+                res.classList.remove('hidden');
+            }
+        }
+
+        async function sendAiMessage() {
+            const input = document.getElementById('aiInput');
+            const prompt = input.value.trim();
+            if(!prompt) return;
+
+            appendChatMessage('user', prompt);
+            input.value = '';
+
+            const loadingId = appendChatMessage('ai', 'Думаю над фінансовою порадою...');
+
+            try {
+                const systemPrompt = `Ти досвідчений фінансовий консультант за методикою конвертів YNAB. 
+                Поточний стан користувача:
+                - Загальний баланс картка: ${state.accounts.reduce((s,a)=>s+a.balance,0)} UAH
+                - Готові до розподілу: ${state.readyToAssign} UAH
+                - Конверти: ${JSON.stringify(state.envelopes.map(e => ({name: e.name, balance: e.balance})))}
+                Давай стислі, корисні, конкретні поради українською мовою.`;
+
+                const apiKey = ""; // Використовує вбудований API key під час виконання
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] }
+                    })
+                });
+
+                const data = await response.json();
+                const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Вибачте, не вдалося отримати відповідь від AI.";
+
+                document.getElementById(loadingId).remove();
+                appendChatMessage('ai', aiReply);
+            } catch(e) {
+                document.getElementById(loadingId).remove();
+                appendChatMessage('ai', "Помилка зв'язку з AI. Спробуйте пізніше.");
+            }
+        }
+
+        async function generateAiFinancialReview() {
+            switchTab('ai');
+            const input = document.getElementById('aiInput');
+            input.value = "Проведи аудит мого бюджету та надай 3 ключові поради.";
+            sendAiMessage();
+        }
+
+        function appendChatMessage(role, text) {
+            const container = document.getElementById('chatMessages');
+            const id = 'msg_' + Date.now();
+            const isUser = role === 'user';
+
+            const msgDiv = document.createElement('div');
+            msgDiv.id = id;
+            msgDiv.className = `p-3 rounded-2xl max-w-[85%] text-sm ${
+                isUser 
+                ? 'bg-indigo-600 text-white ml-auto' 
+                : 'bg-indigo-50 dark:bg-gray-700/60 text-gray-800 dark:text-gray-100 mr-auto'
+            }`;
+            msgDiv.textContent = text;
+
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+            return id;
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function openTransferModal() { populateDropdowns(); openModal('transferModal'); }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", `budget_backup_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+        }
+
+        function importData(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    state = JSON.parse(evt.target.result);
+                    saveState();
+                    closeModal('backupModal');
+                    alert('Дані успішно імпортовано!');
+                } catch(err) {
+                    alert('Помилка при зчитуванні файлу backup!');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Початкова установка дати у формі
+        document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+
+        // Первинний рендеринг при завантаженні
+        window.onload = function() {
+            renderAll();
+        };
+    </script>
+</body>
+</html>
